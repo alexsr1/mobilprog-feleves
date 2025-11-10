@@ -35,53 +35,86 @@ namespace Mobilprog.Services
             // You will need to adjust these regex patterns based on the actual Spar receipt format.
             var receipt = new Receipt
             {
-                Date = DateTime.Now, // Default to now, try to extract from PDF
-                StoreName = "Unknown Spar Store", // Default, try to extract from PDF
-                TotalPrice = 0, // Default, try to extract from PDF
-                PdfPath = filePath
+                Date = DateTime.Now,
+                StoreName = "Unknown Store",
+                TotalPrice = 0,
+                PdfPath = filePath,
+                PaymentMethod = "Unknown",
+                ReceiptNumber = "N/A"
             };
 
-            // Example regex for date (e.g., "2025.10.26.")
-            var dateMatch = Regex.Match(allText, @"\d{4}\.\d{2}\.\d{2}\.");
-            if (dateMatch.Success && DateTime.TryParse(dateMatch.Value.Replace(".", "-").TrimEnd('-'), out DateTime parsedDate))
+            // Extract Store Name
+            var storeNameMatch = Regex.Match(allText, @"SPAR MARKET [^\n]+");
+            if (storeNameMatch.Success)
             {
-                receipt.Date = parsedDate;
+                receipt.StoreName = storeNameMatch.Value.Trim();
             }
 
-            // Example regex for store name (e.g., "SPAR Budapest, Kossuth Lajos u. 1.")
-            var storeMatch = Regex.Match(allText, @"SPAR\s+[^,\n]+(?:,\s*[^,\n]+)*");
-            if (storeMatch.Success)
+            // Extract Date and Time
+            var dateTimeMatch = Regex.Match(allText, @"(\d{4}\.\d{2}\.\d{2}\.)\s*(\d{2}:\d{2})");
+            if (dateTimeMatch.Success)
             {
-                receipt.StoreName = storeMatch.Value.Trim();
+                if (DateTime.TryParse(dateTimeMatch.Groups[1].Value.Replace(".", "-").TrimEnd('-'), out DateTime parsedDate))
+                {
+                    receipt.Date = parsedDate;
+                }
+                // Optionally, you can also store the time separately if needed
+                // string time = dateTimeMatch.Groups[2].Value;
+            }
+            else
+            {
+                // Fallback for date if not found with time
+                var dateMatch = Regex.Match(allText, @"\d{4}\.\d{2}\.\d{2}\.");
+                if (dateMatch.Success && DateTime.TryParse(dateMatch.Value.Replace(".", "-").TrimEnd('-'), out DateTime parsedDate))
+                {
+                    receipt.Date = parsedDate;
+                }
             }
 
-            // Example regex for total price (e.g., "ÖSSZESEN: 1234.56 Ft")
-            var totalMatch = Regex.Match(allText, @"ÖSSZESEN:\s*(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)\s*Ft");
-            if (totalMatch.Success && decimal.TryParse(totalMatch.Groups[1].Value.Replace(".", "").Replace(",", "."), out decimal totalPrice))
+
+            // Extract Receipt Number
+            var receiptNumberMatch = Regex.Match(allText, @"NYUGTASZÁM:(\d{4}/\d{5})");
+            if (receiptNumberMatch.Success)
+            {
+                receipt.ReceiptNumber = receiptNumberMatch.Groups[1].Value;
+            }
+
+            // Extract Total Price
+            var totalMatch = Regex.Match(allText, @"Összeg:\s*([\d\s]+)\s*FT");
+            if (totalMatch.Success && decimal.TryParse(totalMatch.Groups[1].Value.Replace(" ", "").Replace(",", "."), out decimal totalPrice))
             {
                 receipt.TotalPrice = totalPrice;
             }
 
+            // Extract Payment Method
+            var paymentMethodMatch = Regex.Match(allText, @"(Bankkártya|Készpénz)\s*[\d\s]+FT");
+            if (paymentMethodMatch.Success)
+            {
+                receipt.PaymentMethod = paymentMethodMatch.Groups[1].Value;
+            }
 
             var products = new List<Product>();
 
-            // Placeholder for product extraction
-            // This is a very basic example. Real-world receipts will require more robust parsing.
-            // Look for lines that might represent products, e.g., "S-BUDGET CSIRKE INS.T.90 1 db 1234 Ft"
-            var productLineRegex = new Regex(@"^(?<name>.+?)\s+(?<quantity>\d+(?:,\d+)?)\s*(?<unit>kg|db|liter)?\s+(?<price>\d{1,3}(?:\.\d{3})*(?:,\d{2})?)\s*Ft$", RegexOptions.Multiline);
-
-            foreach (Match match in productLineRegex.Matches(allText))
+            // Extract products
+            // Products are between "---- NEM ADÓÜGYI BIZONYLAT ---" and "Összeg:"
+            var productSectionMatch = Regex.Match(allText, @"---- NEM ADÓÜGYI BIZONYLAT ---(.*?)(?=Összeg:)", RegexOptions.Singleline);
+            if (productSectionMatch.Success)
             {
-                if (decimal.TryParse(match.Groups["price"].Value.Replace(".", "").Replace(",", "."), out decimal price) &&
-                    decimal.TryParse(match.Groups["quantity"].Value.Replace(",", "."), out decimal quantity))
+                string productSection = productSectionMatch.Groups[1].Value;
+                var productLineRegex = new Regex(@"^[A-Z]\d{2}\s(.+?)\s(\d+)$", RegexOptions.Multiline);
+
+                foreach (Match match in productLineRegex.Matches(productSection))
                 {
-                    products.Add(new Product
+                    if (decimal.TryParse(match.Groups[2].Value.Replace(" ", "").Replace(",", "."), out decimal price))
                     {
-                        OriginalName = match.Groups["name"].Value.Trim(),
-                        Price = price,
-                        Quantity = quantity,
-                        Unit = match.Groups["unit"].Success ? match.Groups["unit"].Value.Trim() : "db" // Default unit if not specified
-                    });
+                        products.Add(new Product
+                        {
+                            OriginalName = match.Groups[1].Value.Trim(),
+                            Price = price,
+                            Quantity = 1, // Assuming quantity is 1 if not explicitly stated
+                            Unit = "db" // Default unit to 'db' (piece)
+                        });
+                    }
                 }
             }
 

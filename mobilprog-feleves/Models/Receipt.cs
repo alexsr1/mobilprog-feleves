@@ -11,5 +11,7 @@ namespace Mobilprog.Models
         public string? StoreName { get; set; }
         public decimal TotalPrice { get; set; }
         public string? PdfPath { get; set; }
+        public string? PaymentMethod { get; set; }
+        public string? ReceiptNumber { get; set; }
     }
 }
