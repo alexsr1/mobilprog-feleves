@@ -1,0 +1,65 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:Mobilprog.ViewModels"
+             xmlns:models="clr-namespace:Mobilprog.Models"
+             x:DataType="viewmodels:MainViewModel"
+             x:Class="Mobilprog.Views.MainPage">
+
+    <ScrollView>
+        <VerticalStackLayout
+            Padding="30,0"
+            Spacing="25">
+
+            <Label
+                Text="Receipt Processor"
+                Style="{StaticResource Headline}"
+                SemanticProperties.HeadingLevel="Level1"
+                HorizontalOptions="Center" />
+
+            <Button
+                Text="Upload Receipt PDF"
+                Command="{Binding UploadReceiptCommand}"
+                HorizontalOptions="Fill"
+                IsEnabled="{Binding IsNotBusy}" />
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="{StaticResource Primary}" />
+
+            <Label
+                Text="{Binding StatusMessage}"
+                HorizontalOptions="Center"
+                FontSize="Medium" />
+
+            <Frame IsVisible="{Binding LatestReceipt, Converter={StaticResource IsNotNullConverter}}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Latest Receipt" FontSize="Title" FontAttributes="Bold" />
+                    <Label Text="{Binding LatestReceipt.StoreName}" FontSize="Medium" />
+                    <Label Text="{Binding LatestReceipt.Date, StringFormat='{0:dd/MM/yyyy}'}" FontSize="Small" />
+                    <Label Text="{Binding LatestReceipt.TotalPrice, StringFormat='Total: {0:C}'}" FontSize="Small" />
+
+                    <CollectionView ItemsSource="{Binding LatestReceiptProducts}">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:Product">
+                                <Grid Padding="5">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Label Grid.Column="0" Text="{Binding ReadableName}" />
+                                    <Label Grid.Column="1" Text="{Binding Quantity}" Margin="10,0" />
+                                    <Label Grid.Column="2" Text="{Binding Price, StringFormat='{0:C}'}" />
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </Frame>
+
+            <Button Text="View All Receipts" Command="{Binding NavigateToReceiptsListCommand}" HorizontalOptions="Fill" />
+            <Button Text="View All Products" Command="{Binding NavigateToProductsListCommand}" HorizontalOptions="Fill" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>
